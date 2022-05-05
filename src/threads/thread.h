@@ -98,6 +98,11 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
+    /*******************************************************************/
+    int64_t wake_up_ticks;
+    struct list_elem sleeping_elem;
+    /*******************************************************************/
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
@@ -137,5 +142,9 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/*******************************************************************/
+bool less_priority_comp(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+/*******************************************************************/
 
 #endif /* threads/thread.h */
