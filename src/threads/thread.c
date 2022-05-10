@@ -12,7 +12,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #ifdef USERPROG
-#include "userprog/process.h"
+#include "userprog/process.h"rr
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -350,8 +350,22 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
-  /*******************************************************************/    
+
+  /*******************************************************************/
+  if (!list_empty(&(thread_current()->aquired_locks))){
+    if (!(list_entry(list_back(&(thread_current()->aquired_locks)), struct lock, myLock)->priority > new_priority)){
+      thread_current ()->priority = new_priority;
+      thread_current()->real_priority = new_priority;
+    }
+    else{
+      thread_current()->real_priority = new_priority;
+    }
+  }
+  else{
+    thread_current()->priority = new_priority;
+    thread_current()->real_priority = new_priority;
+  }
+
   enum intr_level old_level;
   ASSERT (!intr_context ());
   old_level = intr_disable ();
@@ -487,6 +501,13 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+
+  /*******************************************************************/
+  t->real_priority = priority;
+  list_init(&(t->aquired_locks));
+  t->waiting_on_lock = NULL;
+  /*******************************************************************/
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -616,6 +637,18 @@ less_priority_comp(const struct list_elem* a, const struct list_elem* b, void* a
 {
   int a_priority = (list_entry(a, struct thread, elem))->priority;
   int b_priority = (list_entry(b, struct thread, elem))->priority;
-  return a_priority < b_priority;
+  return a_priority <= b_priority;
+}
+
+void
+nested_donation(struct thread* myThread){
+  if (myThread == NULL || myThread->waiting_on_lock == NULL){
+    return;
+  }
+  if (myThread->priority > myThread->waiting_on_lock->priority){
+    myThread->waiting_on_lock->priority = myThread->priority;
+    myThread->waiting_on_lock->holder->priority = myThread->priority;
+  }
+  nested_donation(myThread->waiting_on_lock->holder);
 }
 /*******************************************************************/

@@ -9,6 +9,7 @@ struct semaphore
   {
     unsigned value;             /* Current value. */
     struct list waiters;        /* List of waiting threads. */
+    
   };
 
 void sema_init (struct semaphore *, unsigned value);
@@ -22,7 +23,22 @@ struct lock
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
+
+    /*******************************************************************/
+    struct list_elem myLock;
+    int priority;
+    /*******************************************************************/
+
   };
+
+  
+
+
+/*******************************************************************/
+bool sema_less_compare (const struct list_elem* a, const struct list_elem* b, void* aux);
+
+bool less_lock_priority_comp(const struct list_elem* a, const struct list_elem* b, void* aux);
+/*******************************************************************/
 
 void lock_init (struct lock *);
 void lock_acquire (struct lock *);

@@ -101,7 +101,13 @@ struct thread
     /*******************************************************************/
     int64_t wake_up_ticks;
     struct list_elem sleeping_elem;
+
+    int real_priority;
+    struct list aquired_locks;
+    struct lock* waiting_on_lock;
     /*******************************************************************/
+
+
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
@@ -145,6 +151,8 @@ int thread_get_load_avg (void);
 
 /*******************************************************************/
 bool less_priority_comp(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+
+void nested_donation(struct thread* myThread);
 /*******************************************************************/
 
 #endif /* threads/thread.h */
