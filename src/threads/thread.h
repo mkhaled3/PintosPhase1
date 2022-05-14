@@ -99,12 +99,12 @@ struct thread
 #endif
 
     /*******************************************************************/
-    int64_t wake_up_ticks;
-    struct list_elem sleeping_elem;
+    int64_t wake_up_ticks;                /* variable to hold the thread wake up tick in case if it was put into sleep */
+    struct list_elem sleeping_elem;       /* list element to be used storing the thread in "sleeping threads list" in order to be iterated and wake up */
 
-    int real_priority;
-    struct list aquired_locks;
-    struct lock* waiting_on_lock;
+    int real_priority;                    /* variable to store the thread original priority to replace the virtual priority came from priority donation */
+    struct list aquired_locks;            /* list of the thread aquired locks (used for priority donation) */
+    struct lock* waiting_on_lock;         /* variable to store the lock that thread is waiting on (used for nested priority donation) */
     /*******************************************************************/
 
 
@@ -150,7 +150,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 /*******************************************************************/
-bool less_priority_comp(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+bool less_thread_priority_comp(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
 
 void nested_donation(struct thread* myThread);
 /*******************************************************************/

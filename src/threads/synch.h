@@ -23,21 +23,15 @@ struct lock
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
-
     /*******************************************************************/
-    struct list_elem myLock;
-    int priority;
+    struct list_elem myLock;    /* list element to add the lock into a list (thread aquired locks list) */
+    int priority;               /* Priority variable to be used in priority donation (for sorting locks in thread aquired locks list) */
     /*******************************************************************/
-
   };
 
-  
-
-
 /*******************************************************************/
-bool sema_less_compare (const struct list_elem* a, const struct list_elem* b, void* aux);
-
-bool less_lock_priority_comp(const struct list_elem* a, const struct list_elem* b, void* aux);
+bool less_sema_priority_comp (const struct list_elem* a, const struct list_elem* b, void* aux);
+bool less_lock_priority_comp (const struct list_elem* a, const struct list_elem* b, void* aux);
 /*******************************************************************/
 
 void lock_init (struct lock *);

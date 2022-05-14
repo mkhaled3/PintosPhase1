@@ -31,6 +31,7 @@ static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
 /*******************************************************************/
+//List to hold sleeping threads, sorted so the least thread with wake up ticks is on the beining of the list.
 struct list sleeping_threads_list;
 /*******************************************************************/
 
@@ -91,8 +92,9 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 /*******************************************************************/
+//Comparator to be passed for list_insert_ordered to sort threads by their wake up ticks
 bool
-less_wake_up_ticks_comp (const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
+less_thread_wake_up_ticks_comp (const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
 {
   int64_t a_wake_up_ticks = (list_entry(a, struct thread, sleeping_elem))->wake_up_ticks;
   int64_t b_wake_up_ticks = (list_entry(b, struct thread, sleeping_elem))->wake_up_ticks;
@@ -109,6 +111,14 @@ timer_sleep (int64_t ticks)
 
   ASSERT (intr_get_level () == INTR_ON);
   /*******************************************************************/
+  /* Make sure that ticks to sleep isn't either zero or negative (instant wake up).
+     Disable the interrupt to avoide many threads overlap reading/writing the list.
+     Set the thread wake up ticks and insert it in its decreasing order to the sleaping threads list.
+     Block the thread to put it into sleep.
+     (Note we are inserting the threads in order to avoide much overhead at interrupt handlers when waking them up,
+     so the interrupt handler will check if its time to wake the first thread in the list, if so wake the thread up and,
+     check the next thread, else do nothing)
+   */
   if (ticks > 0)
     {
       enum intr_level old_level;
@@ -117,7 +127,7 @@ timer_sleep (int64_t ticks)
 
       struct thread* thread_to_sleep = thread_current ();
       thread_to_sleep->wake_up_ticks = timer_ticks () + ticks;
-      list_insert_ordered (&sleeping_threads_list, &(thread_to_sleep->sleeping_elem), &less_wake_up_ticks_comp, NULL);
+      list_insert_ordered (&sleeping_threads_list, &(thread_to_sleep->sleeping_elem), &less_thread_wake_up_ticks_comp, NULL);
       thread_block ();
 
       intr_set_level (old_level);
@@ -202,6 +212,10 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
   /*******************************************************************/
+  /* Disable the interrupts so an interrupt can't be interrupted (maybe in the future).
+     Iterate the sorted sleeping threads list, if it's time to wake up the first thread (least wake up ticks)
+     Unblock the thread, remove it from the list, and check the next (first) thread, else break
+     (Note we are enabling the interrupts at safe zones and disabling it over and over to avoid performance issues) */
   enum intr_level old_level;
   old_level = intr_disable ();
 
