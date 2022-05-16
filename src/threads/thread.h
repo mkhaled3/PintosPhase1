@@ -107,8 +107,6 @@ struct thread
     struct lock* waiting_on_lock;         /* variable to store the lock that thread is waiting on (used for nested priority donation) */
     /*******************************************************************/
 
-
-
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

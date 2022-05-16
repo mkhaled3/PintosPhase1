@@ -243,10 +243,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  /*******************************************************************/
-  //insert the threads in order to the ready list (highest priority at the end) to be ease the process of priority scheduling
-  list_insert_ordered (&ready_list, &t->elem, &less_thread_priority_comp, NULL);
-  /*******************************************************************/
+  list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -317,10 +314,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread)
-    /*******************************************************************/
-    //insert the threads in order to the ready list (highest priority at the end) to be ease the process of priority scheduling
-    list_insert_ordered (&ready_list, &cur->elem, &less_thread_priority_comp, NULL);
-    /*******************************************************************/
+    list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -348,12 +342,14 @@ void
 thread_set_priority (int new_priority) 
 {
   /*******************************************************************/
-  /* if the thread has no aquired locks or if the new priority is higher than the highest priority aquired lock (the one at the end),
+  /* if the thread has no aquired locks or if the new priority is higher than the highest priority aquired lock,
      change the thread working and original priority to the new priority, else just change the thread original priority because the working priority is needed for donation
      Disable the interrupts to avoide multiple threads overlapping reading/editing the ready list
      Sellect the highest priority thread in the ready list (the one at the end), if its priority is higher than the current working one, reschedule */
   if (!list_empty(&(thread_current()->aquired_locks))){
-    if (new_priority > list_entry(list_back(&(thread_current()->aquired_locks)), struct lock, myLock)->priority){
+    struct list_elem *max_priority_elem = list_max (&(thread_current()->aquired_locks), &less_lock_priority_comp, NULL);
+    struct lock *max_priority_lock = list_entry (max_priority_elem, struct lock, myLock);
+    if (new_priority > max_priority_lock->priority){
       thread_current()->priority = new_priority;
       thread_current()->real_priority = new_priority;
     }
@@ -372,8 +368,12 @@ thread_set_priority (int new_priority)
   ASSERT (!intr_context ());
   old_level = intr_disable ();
 
-  if (!list_empty(&ready_list) && list_entry(list_back(&ready_list), struct thread, elem)->priority > thread_current()->priority)
-    thread_yield ();
+  if (!list_empty(&ready_list)){
+    struct list_elem *max_priority_elem = list_max (&ready_list, &less_thread_priority_comp, NULL);
+    struct thread *max_priority_thread = list_entry (max_priority_elem, struct thread, elem);
+    if (max_priority_thread->priority > thread_current()->priority)
+      thread_yield ();
+  }
 
   intr_set_level (old_level);
   /*******************************************************************/
@@ -538,13 +538,16 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  if (list_empty (&ready_list))
+  if (list_empty (&ready_list)){
     return idle_thread;
-  else
+  }else{
     /*******************************************************************/
-    //Choose the thread with highest priority (the pne at the end of the ready list)
-    return list_entry (list_pop_back (&ready_list), struct thread, elem);
+    //Choose the thread with highest priority to be returned and removed from the ready list
+    struct list_elem *max_priority_elem = list_max (&ready_list, &less_thread_priority_comp, NULL);
+    list_remove (max_priority_elem);
+    return list_entry (max_priority_elem, struct thread, elem);
     /*******************************************************************/
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -635,13 +638,13 @@ allocate_tid (void)
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 /*******************************************************************/
-//Comparator to be passed for list_insert_ordered/list_max to sort/find threads by their priority
+//Comparator to be passed for list_max to find threads by their priority
 bool
 less_thread_priority_comp(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
 {
   int a_priority = (list_entry(a, struct thread, elem))->priority;
   int b_priority = (list_entry(b, struct thread, elem))->priority;
-  return a_priority <= b_priority;
+  return a_priority < b_priority;
 }
 
 /* function to donate the thread priority to its waiting on lock and waiting on lock holder,

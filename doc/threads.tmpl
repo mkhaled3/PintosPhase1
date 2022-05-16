@@ -154,7 +154,7 @@ TODO:
     change the thread working and original priority to the new priority,
     else just change the thread original priority because the working priority is needed for donation
 - Disable the interrupts to avoide multiple threads overlapping reading/editing the ready list
-- Sellect the highest priority thread in the ready list (the one at the end), if its priority is higher than the current working one, reschedule
+- Sellect the highest priority thread in the ready list, if its priority is higher than the current working one, reschedule
 */
 
 /*
@@ -168,7 +168,10 @@ Note that we are disabling the interrupts and we can't use locks, because if an 
 >> another design you considered?
 
 /*
-
+- using list_max insted of list_insert_ordered when sellecting highes priority thread, lock, or semaphore prevents us from
+    reordring the lists each time a thread change its priority.
+- using a pointer in condition variables to point for the threads priority prevents us from changing the semaphore_elem priority each time the thread change its priority.
+- avoid using unnecessary busy waiting, synchronization tools helps to increase the performance.
 */
 
               ADVANCED SCHEDULER
