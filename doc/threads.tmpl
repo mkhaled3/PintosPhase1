@@ -8,6 +8,7 @@
 
 >> Fill in the names and email addresses of your group members.
 
+Mohamed Khaled <es-mohamed.khaled.abbas20@alexu.edu.eg>
 FirstName LastName <email@domain.example>
 FirstName LastName <email@domain.example>
 FirstName LastName <email@domain.example>
@@ -30,26 +31,65 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+/*
+timer.c: global:
+struct list sleeping_threads_list       /* List to hold sleeping threads, sorted so the least thread with wake up ticks is on the beining of the list. */
+struct lock lock_sleeping_threads_list  /* lock to synchronize editing the sleeping_threads_list */
+
+thread.h: struct thread:
+int64_t wake_up_ticks                   /* variable to hold the thread wake up tick in case if it was put into sleep */
+struct list_elem sleeping_elem          /* list element to be used storing the thread in "sleeping threads list" in order to be iterated and waken up */
+*/
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+/*
+- Make sure that ticks to sleep isn't either zero or negative (instant wake up).
+- acquire the lock_sleeping_threads_list avoide many threads overlap reading/writing the list.
+- Set the thread wake up ticks and insert it in its decreasing order to the sleaping threads list.
+- Disable the interrupt to block the thread to put it into sleep.
+- (Note we are inserting the threads in order to avoide much overhead at interrupt handlers when waking them up,
+    so the interrupt handler will check if its time to wake the first thread in the list, if so wake the thread up and,
+    check the next thread, else do nothing)
+*/
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+
+/*
+- We are inserting the threads in the sleeping_threads_list in order by their wake_up_ticks to avoide much overhead at interrupt handlers when waking them up,
+    so the interrupt handler will check if its time to wake the first thread in the list, if so wake the thread up and,
+    check the next thread, else do nothing.
+*/
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
 
+/*
+- Only one thread who acquired the lock_sleeping_threads_list will edit the sleeping_threads_list, the rest will wait on the lock
+*/
+
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
+
+/*
+- In timer_interrupt, Check if the sleeping threads list is being edited (a thread is holding the lock), if so then return
+*/
 
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+/*
+- Using synchronization tools like the lock_sleeping_threads_list rather than disabling the interrupts avoide halting the system.
+- Inserting the threads in order by their wake_up_ticks avoid much overhead at timer_interrupt iterating the whole list sellecting first thread to be waken up.
+*/
 
              PRIORITY SCHEDULING
              ===================
@@ -60,20 +100,48 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+/*
+synch.h: struct lock:
+struct list_elem myLock            /* list element to add the lock into a list (thread aquired locks list) used in priority donation */
+int priority                       /* Priority variable to be used in priority donation (for sorting locks in thread aquired locks list) */
+
+synch.c: struct semaphore_elem:
+int *priority                      /* pointer for the waiting thread priority, used to unblock the highest priority thread on condvars */
+*/
+
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
+
+/*
+TODO:
+*/
 
 ---- ALGORITHMS ----
 
 >> B3: How do you ensure that the highest priority thread waiting for
 >> a lock, semaphore, or condition variable wakes up first?
 
+/*
+- at semaphores we iterate the waiters list using list_max to sellect the highest priority thread to be waken up,
+    if the sellected thread's priority higher than the current working thread yield the processor (reschedule).
+- locks are using the semaphores so they face no problems.
+- at condvars each semaphore has a pointer pointing to the waiting thread priority so we iterate the waiters list using list_max to sellect highest priority thread.
+*/
+
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
 
+/*
+TODO:
+*/
+
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
+
+/*
+TODO:
+*/
 
 ---- SYNCHRONIZATION ----
 
@@ -81,10 +149,27 @@ FirstName LastName <email@domain.example>
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
+/*
+- if the thread has no aquired locks or if the new priority is higher than the highest priority aquired lock,
+    change the thread working and original priority to the new priority,
+    else just change the thread original priority because the working priority is needed for donation
+- Disable the interrupts to avoide multiple threads overlapping reading/editing the ready list
+- Sellect the highest priority thread in the ready list (the one at the end), if its priority is higher than the current working one, reschedule
+*/
+
+/*
+Note that we are disabling the interrupts and we can't use locks, because if an interrupt happened while that thread is holding the lock,
+    another thread might work and wait for the same lock causing an infinity loop of reschedulting.
+*/
+
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+/*
+
+*/
 
               ADVANCED SCHEDULER
               ==================

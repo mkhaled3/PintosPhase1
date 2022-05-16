@@ -349,7 +349,9 @@ thread_set_priority (int new_priority)
 {
   /*******************************************************************/
   /* if the thread has no aquired locks or if the new priority is higher than the highest priority aquired lock (the one at the end),
-     change the thread working and original priority to the new priority, else just change the thread original priority because the working priority is needed for donation */
+     change the thread working and original priority to the new priority, else just change the thread original priority because the working priority is needed for donation
+     Disable the interrupts to avoide multiple threads overlapping reading/editing the ready list
+     Sellect the highest priority thread in the ready list (the one at the end), if its priority is higher than the current working one, reschedule */
   if (!list_empty(&(thread_current()->aquired_locks))){
     if (new_priority > list_entry(list_back(&(thread_current()->aquired_locks)), struct lock, myLock)->priority){
       thread_current()->priority = new_priority;
@@ -364,6 +366,8 @@ thread_set_priority (int new_priority)
     thread_current()->real_priority = new_priority;
   }
 
+  /* Note that we are disabling the interrupts and we can't use locks, because if an interrupt happened while that thread is holding the lock,
+     another thread might work and wait for the same lock causing an infinity loop of reschedulting */
   enum intr_level old_level;
   ASSERT (!intr_context ());
   old_level = intr_disable ();

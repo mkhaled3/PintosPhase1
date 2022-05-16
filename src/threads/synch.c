@@ -227,17 +227,24 @@ lock_acquire (struct lock *lock)
 
   /*******************************************************************/
   /* if the thread failed to acquire the lock, set its waiting_on_lock.
+     Disable the interrupts to avoide many threads overlabing editing/reading the lock global info.
      if its priority is higher than the lock's priority, set the lock's and its holder's priority to the thread priority and donate it for the lock holder.
      block the thread, after it's unblocked set its waiting_on_lock to null and insert the lock to its acquired_locks in order by the lock's priority,
      in order to be sellected later in priority donation */
   if (!lock_try_acquire(lock)){
     thread_current()->waiting_on_lock = lock;
 
+    enum intr_level old_level;
+    ASSERT (!intr_context ());
+    old_level = intr_disable ();
+
     if (lock->priority < thread_current()->priority){
       lock->priority = thread_current()->priority;
       lock->holder->priority = lock->priority;
       nested_donation(lock->holder);
-    }    
+    }
+
+    intr_set_level (old_level);
     
     sema_down (&lock->semaphore);
     lock->holder = thread_current ();
@@ -266,8 +273,8 @@ lock_try_acquire (struct lock *lock)
   if (success){
     lock->holder = thread_current ();
     /*******************************************************************/
-    /* insert the lock to its acquired_locks in order by the lock's priority, in order to be sellected later in priority donation
-       if the thread acquired the lock check if the threade will donate its priority to the lock or vice versa */
+    /* if the thread acquired the lock check if the threade will donate its priority to the lock or vice versa
+       insert the lock to its acquired_locks in order by the lock's priority, in order to be sellected later in priority donation */
     if (lock->priority > lock->holder->priority)
       lock->holder->priority = lock->priority;
     else
@@ -294,11 +301,7 @@ lock_release (struct lock *lock)
   //remove the lock from the thread's acquired lock list
   list_remove(&(lock->myLock));
 
-  /* if there is threads waiting on the lock set the lock priority to the maximum thread's priority waiting on its semaphore, else set its priority to 0
-     (we are disabling the inturrupt because the lock semaphore waiters is a global editable list) */
-  enum intr_level old_level;
-  ASSERT (!intr_context ());
-  old_level = intr_disable ();
+  /* if there is threads waiting on the lock set the lock priority to the maximum thread's priority waiting on its semaphore, else set its priority to 0 */
   if (!list_empty(&(lock->semaphore.waiters))){
     struct list_elem *max_priority_elem = list_max ((&lock->semaphore.waiters), &less_thread_priority_comp, NULL);
     struct thread *max_priority_thread = list_entry (max_priority_elem, struct thread, elem);
@@ -306,8 +309,6 @@ lock_release (struct lock *lock)
   }else{
     lock->priority = 0;
   }
-  intr_set_level (old_level);
-
 
   /* if the thread is holding another locks sellect the highest lock's priority (the one at the end),
      then sellect the highest priority either of the lock or of the thread original priority, and assign it to each others,
@@ -406,17 +407,13 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
   
   /*******************************************************************/
-  //find the maximum priority semaphore (waiting thread) to be signaled first (disable the inturrupts because cond and its lists are global)
-  enum intr_level old_level;
-  ASSERT (!intr_context ());
-  old_level = intr_disable ();
+  //find the maximum priority semaphore (waiting thread) to be signaled first
   if (!list_empty(&(cond->waiters))){
     struct list_elem *max_priority_elem = list_max ((&cond->waiters), &less_sema_priority_comp, NULL);
     struct semaphore_elem *max_priority_sema = list_entry (max_priority_elem, struct semaphore_elem, elem);
     list_remove (max_priority_elem);
     sema_up (&max_priority_sema->semaphore);
   }
-  intr_set_level (old_level);
   /*******************************************************************/
 }
 
