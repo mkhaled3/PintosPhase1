@@ -114,7 +114,8 @@ int *priority                      /* pointer for the waiting thread priority, u
 >> .png file.)
 
 /*
-TODO:
+priority is donated to the locks so there is no distinct data structure to track the donations, how the priority is donated is explained in details in question b4 and b5
+png file is added															
 */
 
 ---- ALGORITHMS ----
@@ -133,14 +134,27 @@ TODO:
 >> causes a priority donation.  How is nested donation handled?
 
 /*
-TODO:
+First call the lock_try_aquire function if the return value is true the lock holder gets the priority of the lock if the lock's priority is higher than the thread's priority
+if the threads priority is higher the lock takes the thread's priority and then we insert that lock into the list of aquired locks of that thread
+if the return value is false the thread's waiting on lock is set to this lock and then we repeat the steps of checking whose priority is higher the lock or the thread
+and then we call nested_donation function 
+nested_donation is a recursive function that checks if the thread priority is higher than the waiting on lock priority if so let the lock priority = the thread priority and the
+holder of that lock takes that priority and then we call it again with the holder of that lock becuase it should donate to other threads that aquired a lock that this thread is
+waiting on we keep calling it untill the waiting on lock is null or the thread is null and then when we return from that recursive call we call sema down and set the holder of
+the lock to this thread and set the waiting on lock to null
 */
 
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
 
 /*
-TODO:
+first remove the lock from the list of the threads aquired locks
+the lock takes the highest priority among the waitiers on it
+if there are no waitiers the locks priority is set to zero
+
+if the thread that released the lock has other locks in the aquired locks list we check if the highest priority lock is higher than this thread base priority if so
+we set the priority of that thread to the highest priority lock
+otherwise we set the thread's priority to the base priority
 */
 
 ---- SYNCHRONIZATION ----

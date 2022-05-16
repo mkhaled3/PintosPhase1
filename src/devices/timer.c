@@ -248,6 +248,14 @@ timer_interrupt (struct intr_frame *args UNUSED)
         
       old_level = intr_disable ();
     }
+  if (thread_mlfqs)
+    {
+        increment_recent_cpu();
+        if (ticks % TIMER_FREQ == 0)
+            update_load_avg_and_recent_cpu();
+        else if (ticks % 4 == 0)
+            update_priority(thread_current());
+    }
   /*******************************************************************/
 }
 

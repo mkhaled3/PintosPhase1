@@ -231,6 +231,13 @@ lock_acquire (struct lock *lock)
      if its priority is higher than the lock's priority, set the lock's and its holder's priority to the thread priority and donate it for the lock holder.
      block the thread, after it's unblocked set its waiting_on_lock to null and insert the lock to its aquired_locks in order by the lock's priority,
      in order to be sellected later in priority donation */
+  if (thread_mlfqs)
+  {
+    sema_down (&lock->semaphore);
+    lock->holder = thread_current ();
+    return;
+  }
+  
   if (!lock_try_acquire(lock)){
     thread_current()->waiting_on_lock = lock;
 
@@ -273,13 +280,16 @@ lock_try_acquire (struct lock *lock)
   if (success){
     lock->holder = thread_current ();
     /*******************************************************************/
-    /* if the thread acquired the lock check if the threade will donate its priority to the lock or vice versa
-       insert the lock to its aquired_locks in order to be sellected later in priority donation */
-    if (lock->priority > lock->holder->priority)
-      lock->holder->priority = lock->priority;
-    else
-      lock->priority = lock->holder->priority;
-    list_push_back (&(lock->holder->aquired_locks), &(lock->myLock));
+    if (!thread_mlfqs)
+    {
+      /* if the thread acquired the lock check if the threade will donate its priority to the lock or vice versa
+        insert the lock to its aquired_locks in order to be sellected later in priority donation */
+      if (lock->priority > lock->holder->priority)
+        lock->holder->priority = lock->priority;
+      else
+        lock->priority = lock->holder->priority;
+      list_push_back (&(lock->holder->aquired_locks), &(lock->myLock));
+    }
     /*******************************************************************/
   }
 
@@ -298,33 +308,35 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   /*******************************************************************/
-  //remove the lock from the thread's acquired lock list
-  list_remove(&(lock->myLock));
+  if (!thread_mlfqs){
+    //remove the lock from the thread's acquired lock list
+    list_remove(&(lock->myLock));
 
-  /* if there is threads waiting on the lock set the lock priority to the maximum thread's priority waiting on its semaphore, else set its priority to 0 */
-  if (!list_empty(&(lock->semaphore.waiters))){
-    struct list_elem *max_priority_elem = list_max ((&lock->semaphore.waiters), &less_thread_priority_comp, NULL);
-    struct thread *max_priority_thread = list_entry (max_priority_elem, struct thread, elem);
-    lock->priority = max_priority_thread->priority;
-  }else{
-    lock->priority = 0;
+    /* if there is threads waiting on the lock set the lock priority to the maximum thread's priority waiting on its semaphore, else set its priority to 0 */
+    if (!list_empty(&(lock->semaphore.waiters))){
+      struct list_elem *max_priority_elem = list_max ((&lock->semaphore.waiters), &less_thread_priority_comp, NULL);
+      struct thread *max_priority_thread = list_entry (max_priority_elem, struct thread, elem);
+      lock->priority = max_priority_thread->priority;
+    }else{
+      lock->priority = 0;
+    }
+
+    /* if the thread is holding another locks sellect the highest lock's priority,
+      then sellect the highest priority either of the lock or of the thread original priority, and assign it to each others,
+      else retrieve the thread original priority */
+    if (!list_empty(&(lock->holder->aquired_locks))){
+      struct list_elem *max_priority_elem = list_max (&(lock->holder->aquired_locks), &less_lock_priority_comp, NULL);
+      struct lock *max_priority_lock = list_entry (max_priority_elem, struct lock, myLock);
+      if (max_priority_lock->priority > lock->holder->real_priority)
+        lock->holder->priority = max_priority_lock->priority;
+      else
+        lock->holder->priority = lock->holder->real_priority;      
+    }else{
+      lock->holder->priority = lock->holder->real_priority;
+    }
+    /*******************************************************************/
   }
-
-  /* if the thread is holding another locks sellect the highest lock's priority,
-     then sellect the highest priority either of the lock or of the thread original priority, and assign it to each others,
-     else retrieve the thread original priority */
-  if (!list_empty(&(lock->holder->aquired_locks))){
-    struct list_elem *max_priority_elem = list_max (&(lock->holder->aquired_locks), &less_lock_priority_comp, NULL);
-    struct lock *max_priority_lock = list_entry (max_priority_elem, struct lock, myLock);
-    if (max_priority_lock->priority > lock->holder->real_priority)
-      lock->holder->priority = max_priority_lock->priority;
-    else
-      lock->holder->priority = lock->holder->real_priority;      
-  }else{
-    lock->holder->priority = lock->holder->real_priority;
-  }
-  /*******************************************************************/
-
+  
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
