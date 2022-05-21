@@ -155,9 +155,11 @@ bool less_thread_priority_comp(const struct list_elem* a, const struct list_elem
 
 void nested_donation(struct thread* myThread);
 
-void update_priority(struct thread *t);
+void update_load_avg();
+void update_recent_cpu(struct thread *t, void *aux UNUSED);
 void update_load_avg_and_recent_cpu();
 void increment_recent_cpu();
+void update_priority(struct thread *t, void *aux UNUSED);
 /*******************************************************************/
 
 #endif /* threads/thread.h */
